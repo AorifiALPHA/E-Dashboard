@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SRCA Hospital Time Dashboard — AlphaStar Aviation</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --navy:#0B1F3A;--navy2:#132d52;--gold:#C9A84C;--gold2:#e5c97a;
+  --red:#C8202A;--blue:#1A5FA8;--lblue:#3B8FD4;
+  --green:#0B7B5E;--amber:#D4820A;
+  --off:#F0F3F8;--white:#fff;--text:#111827;--muted:#6B7280;--border:#E5E9F0;
+  --surface:#fff;--surface2:#F8FAFC;
+}
+body{font-family:'DM Sans',sans-serif;background:var(--off);color:var(--text);min-height:100vh;}
+
+/* NAV */
+.nav{background:var(--navy);padding:0 28px;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:200;box-shadow:0 2px 16px rgba(0,0,0,0.35);}
+.nav-brand{display:flex;align-items:center;gap:12px;}
+.nav-logo{width:34px;height:34px;background:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;color:var(--navy);letter-spacing:.04em;flex-shrink:0;}
+.nav-title{color:#fff;font-size:14px;font-weight:700;letter-spacing:.01em;}
+.nav-sub{color:rgba(255,255,255,0.38);font-size:11px;margin-top:1px;}
+.nav-tabs{display:flex;gap:2px;}
+.ntab{color:rgba(255,255,255,0.5);font-size:13px;font-weight:500;padding:7px 15px;border-radius:6px;cursor:pointer;border:none;background:transparent;font-family:inherit;transition:all .15s;letter-spacing:.01em;}
+.ntab:hover{color:#fff;background:rgba(255,255,255,0.08);}
+.ntab.active{color:#fff;background:rgba(201,168,76,0.18);border-bottom:2px solid var(--gold);}
+
+/* PAGES */
+.page{display:none;padding:22px 28px;max-width:1280px;margin:0 auto;}
+.page.active{display:block;}
+
+/* HERO */
+.hero{background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%);border-radius:16px;padding:28px 32px;margin-bottom:20px;position:relative;overflow:hidden;}
+.hero::before{content:'';position:absolute;right:-80px;top:-80px;width:320px;height:320px;border-radius:50%;background:rgba(201,168,76,0.06);pointer-events:none;}
+.hero::after{content:'';position:absolute;right:60px;bottom:-40px;width:180px;height:180px;border-radius:50%;background:rgba(59,143,212,0.07);pointer-events:none;}
+.hero-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.hero-badge{background:rgba(201,168,76,0.18);border:1px solid rgba(201,168,76,0.35);color:var(--gold2);font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;letter-spacing:.08em;}
+.hero-right{display:flex;align-items:center;gap:10px;}
+.hero-month{background:rgba(255,255,255,0.08);border:0.5px solid rgba(255,255,255,0.15);border-radius:8px;padding:5px 12px;color:rgba(255,255,255,0.55);font-size:12px;}
+.hero h1{font-size:24px;font-weight:800;color:#fff;margin-bottom:4px;letter-spacing:-.01em;}
+.hero p{color:rgba(255,255,255,0.42);font-size:13px;}
+
+/* METRICS GRID */
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
+.metric{background:var(--surface);border-radius:12px;padding:16px 18px;border:1px solid var(--border);box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.mlabel{font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500;letter-spacing:.02em;}
+.mval{font-size:24px;font-weight:800;color:var(--text);line-height:1.1;font-variant-numeric:tabular-nums;}
+.msub{font-size:12px;color:var(--muted);margin-top:4px;}
+.metric.blue .mval{color:var(--blue);}
+.metric.green .mval{color:var(--green);}
+.metric.red .mval{color:var(--red);}
+.metric.amber .mval{color:var(--amber);}
+
+/* CARD */
+.card{background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:20px 24px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.card-head h2{font-size:16px;font-weight:700;letter-spacing:-.01em;}
+.avg-pill{display:flex;align-items:center;gap:6px;background:#EBF4FF;padding:4px 12px;border-radius:20px;}
+.avg-dot{width:7px;height:7px;border-radius:50%;background:var(--lblue);flex-shrink:0;}
+.avg-pill span{font-size:12px;color:var(--blue);font-weight:700;}
+
+/* TABS inside card */
+.ctabs{display:flex;gap:4px;background:var(--off);border-radius:8px;padding:3px;}
+.ctab{padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;font-family:inherit;color:var(--muted);transition:all .15s;}
+.ctab.active{background:#fff;color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,0.08);}
+
+/* TABLE */
+.rtable{width:100%;border-collapse:collapse;}
+.rtable th{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:0 10px 10px;text-align:left;border-bottom:2px solid var(--off);}
+.rtable th.r{text-align:right;}
+.rtable td{font-size:14px;padding:11px 10px;border-bottom:1px solid #f4f5f8;vertical-align:middle;}
+.rtable tr:last-child td{border-bottom:none;}
+.rtable tr:hover td{background:#fafbfc;}
+.rnum{font-size:11px;font-weight:700;color:var(--muted);width:26px;}
+.bname{font-weight:700;font-size:14px;}
+.bar-wrap{display:flex;align-items:center;gap:8px;}
+.bar-bg{flex:1;height:7px;background:#f0f1f5;border-radius:4px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:4px;transition:width .9s ease;}
+.bar-val{font-size:13px;font-weight:700;min-width:58px;text-align:right;font-variant-numeric:tabular-nums;}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;letter-spacing:.02em;}
+.badge.good{background:#d1fae5;color:#065f46;}
+.badge.ok{background:#dbeafe;color:#1e40af;}
+.badge.warn{background:#fef3c7;color:#92400e;}
+.badge.bad{background:#fee2e2;color:#991b1b;}
+.vs-up{font-size:13px;font-weight:700;color:#dc2626;}
+.vs-dn{font-size:13px;font-weight:700;color:#059669;}
+.chart-wrap{position:relative;width:100%;height:230px;}
+
+/* STATUS BAR */
+.status-bar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-radius:10px;margin-bottom:16px;font-size:13px;font-weight:500;}
+.status-bar.ok{background:#d1fae5;color:#065f46;}
+.status-bar.loading{background:#fef3c7;color:#92400e;}
+.status-bar.err{background:#fee2e2;color:#991b1b;}
+.sdot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.status-bar.ok .sdot{background:#059669;}
+.status-bar.loading .sdot{background:#d97706;animation:pulse 1s infinite;}
+.status-bar.err .sdot{background:#dc2626;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.rfbtn{margin-left:auto;font-size:12px;font-weight:700;cursor:pointer;text-decoration:underline;background:none;border:none;color:inherit;font-family:inherit;}
+
+/* MAP PAGE */
+.srca-header{display:flex;align-items:center;gap:18px;background:var(--surface);border-radius:14px;border:1px solid var(--border);padding:18px 24px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.srca-text h2{font-size:17px;font-weight:800;color:var(--text);margin-bottom:3px;}
+.srca-text p{font-size:12px;color:var(--muted);line-height:1.55;}
+.srca-stats{display:flex;gap:22px;margin-left:auto;flex-shrink:0;}
+.srca-stat{text-align:center;}
+.srca-stat-v{font-size:20px;font-weight:800;color:var(--red);}
+.srca-stat-l{font-size:10px;color:var(--muted);margin-top:1px;letter-spacing:.03em;}
+.map-wrap{background:var(--surface);border-radius:14px;border:1px solid var(--border);padding:18px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+#d3-map{width:100%;}
+.map-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;padding-top:12px;border-top:1px solid var(--off);align-items:center;}
+.leg-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+.leg-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0;border:2px solid rgba(255,255,255,0.6);}
+.leg-hint{margin-left:auto;font-size:11px;color:#bbb;font-style:italic;}
+
+/* BASE DETAIL */
+.base-detail-card{background:var(--surface);border-radius:14px;border:1px solid var(--border);padding:22px;margin-bottom:18px;display:none;box-shadow:0 1px 4px rgba(0,0,0,0.06);}
+.detail-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;}
+.detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.base-abbr-note{background:var(--off);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);margin-bottom:14px;}
+.base-abbr-note strong{color:var(--blue);font-family:'DM Mono',monospace;font-size:13px;}
+
+/* HOSPITALS TABLE inside base detail */
+.hosp-table{width:100%;border-collapse:collapse;margin-top:10px;}
+.hosp-table th{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:6px 10px;text-align:left;border-bottom:1.5px solid var(--off);}
+.hosp-table td{font-size:13px;padding:8px 10px;border-bottom:1px solid #f5f6fa;vertical-align:middle;}
+.hosp-table tr:last-child td{border-bottom:none;}
+
+/* MISSIONS TABLE */
+.missions-section{margin-top:14px;padding-top:14px;border-top:1px solid var(--off);}
+
+/* KPI OVER 10 */
+.kpi-flag{display:inline-flex;align-items:center;gap:5px;background:#fee2e2;color:#991b1b;font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;}
+
+/* EDIT SECTION */
+.ops-section{background:var(--surface);border-radius:14px;border:2px solid var(--blue);padding:22px;margin-bottom:18px;box-shadow:0 2px 12px rgba(26,95,168,0.08);}
+.ops-section-title{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.ops-section-title h2{font-size:16px;font-weight:800;color:var(--blue);}
+.ops-badge{background:var(--blue);color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:5px;letter-spacing:.04em;}
+
+/* FORM FIELDS */
+.field-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px;}
+.field{display:flex;flex-direction:column;gap:4px;}
+.field label{font-size:11px;font-weight:700;color:var(--muted);letter-spacing:.05em;text-transform:uppercase;}
+.field input,.field select,.field textarea{font-size:13px;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;background:#fff;color:var(--text);outline:none;font-family:inherit;transition:border-color .15s;}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--blue);}
+.field input.readonly-field{background:var(--off);color:var(--muted);cursor:not-allowed;}
+.field textarea{resize:vertical;min-height:60px;}
+.field select{cursor:pointer;}
+.save-row{display:flex;gap:10px;align-items:center;padding-top:4px;}
+.btn-save{background:var(--blue);color:#fff;border:none;border-radius:9px;padding:10px 22px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:background .15s;letter-spacing:.01em;}
+.btn-save:hover{background:#143d72;}
+.btn-cancel{background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:9px;padding:10px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;}
+.btn-cancel:hover{border-color:var(--navy);}
+.save-note{font-size:12px;color:var(--muted);margin-left:8px;}
+
+/* EXEC SECTION */
+.exec-section{background:linear-gradient(135deg,var(--navy) 0%,var(--navy2) 100%);border-radius:14px;padding:22px;margin-bottom:18px;color:#fff;}
+.exec-title{font-size:15px;font-weight:800;color:var(--gold2);letter-spacing:.04em;margin-bottom:6px;}
+.exec-sub{font-size:12px;color:rgba(255,255,255,0.42);margin-bottom:18px;}
+.exec-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
+.exec-kpi{background:rgba(255,255,255,0.06);border:0.5px solid rgba(255,255,255,0.12);border-radius:10px;padding:14px 16px;}
+.exec-kpi-l{font-size:11px;color:rgba(255,255,255,0.45);margin-bottom:5px;letter-spacing:.04em;text-transform:uppercase;}
+.exec-kpi-v{font-size:22px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;}
+.exec-kpi-s{font-size:11px;color:rgba(255,255,255,0.38);margin-top:3px;}
+.exec-bars{display:flex;flex-direction:column;gap:8px;}
+.exec-bar-row{display:flex;align-items:center;gap:10px;}
+.exec-bar-name{font-size:12px;font-weight:600;color:rgba(255,255,255,0.75);min-width:100px;}
+.exec-bar-bg{flex:1;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;}
+.exec-bar-fill{height:100%;border-radius:3px;transition:width .9s ease;}
+.exec-bar-val{font-size:12px;font-weight:700;min-width:52px;text-align:right;font-variant-numeric:tabular-nums;}
+
+/* CONNECT PAGE */
+.conn-hero{background:var(--navy);border-radius:14px;padding:28px;margin-bottom:20px;text-align:center;}
+.conn-hero h2{color:#fff;font-size:22px;font-weight:800;margin-bottom:6px;}
+.conn-hero p{color:rgba(255,255,255,0.42);font-size:13px;}
+.conn-card{background:var(--surface);border-radius:12px;border:1px solid var(--border);padding:24px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.conn-card h3{font-size:16px;font-weight:700;margin-bottom:5px;}
+.conn-card>p{font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.6;}
+.inp-row{display:flex;gap:10px;}
+.inp-row input{flex:1;font-size:14px;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;background:#fff;color:var(--text);outline:none;font-family:inherit;}
+.inp-row input:focus{border-color:var(--blue);}
+.btn-blue{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn-blue:hover{background:#143d72;}
+.btn-demo{background:#fff;color:var(--muted);border:1.5px solid var(--border);border-radius:10px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;}
+.btn-demo:hover{border-color:var(--blue);color:var(--blue);}
+.col-hint{background:#EBF4FF;border-left:4px solid var(--blue);padding:12px 14px;border-radius:0 8px 8px 0;margin-top:12px;}
+.col-hint p{font-size:13px;color:var(--blue);font-weight:500;margin:0;line-height:1.55;}
+.col-hint code{background:#dbeafe;padding:2px 6px;border-radius:4px;font-size:12px;font-family:'DM Mono',monospace;}
+.steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px;}
+.step-box{background:var(--off);border-radius:10px;padding:16px;}
+.step-num{width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:8px;}
+.step-box h4{font-size:13px;font-weight:700;margin-bottom:4px;}
+.step-box p{font-size:12px;color:var(--muted);line-height:1.5;}
+
+/* TOOLTIP */
+.pin-tooltip{position:fixed;background:var(--navy);color:#fff;font-size:12px;font-weight:600;padding:8px 13px;border-radius:8px;pointer-events:none;display:none;white-space:nowrap;z-index:999;box-shadow:0 4px 18px rgba(0,0,0,0.3);}
+
+/* EXPORT */
+.export-row{display:flex;gap:10px;flex-wrap:wrap;}
+.btn-navy{background:var(--navy);color:#fff;border:none;border-radius:10px;padding:11px 20px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn-navy:hover{background:#1a3a6b;}
+.btn-out{background:#fff;color:var(--text);border:1.5px solid var(--border);border-radius:10px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;}
+.btn-out:hover{border-color:var(--navy);}
+
+/* ABBR TABLE */
+.abbr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;}
+.abbr-item{background:var(--off);border-radius:8px;padding:10px 12px;display:flex;align-items:center;gap:10px;}
+.abbr-code{font-family:'DM Mono',monospace;font-size:13px;font-weight:700;color:var(--blue);background:#EBF4FF;padding:3px 8px;border-radius:5px;flex-shrink:0;}
+.abbr-name{font-size:12px;color:var(--text);font-weight:500;}
+
+/* MISSION LIST */
+.mission-row{display:grid;grid-template-columns:auto 1fr 1fr 1fr 1fr auto;gap:8px;align-items:center;padding:8px 10px;border-radius:8px;font-size:13px;cursor:pointer;transition:background .12s;}
+.mission-row:hover{background:var(--off);}
+.mission-row.over10{border-left:3px solid var(--red);}
+.m-call{font-family:'DM Mono',monospace;font-size:12px;font-weight:700;color:var(--blue);}
+.m-edit-btn{background:var(--blue);color:#fff;border:none;border-radius:6px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.m-edit-btn:hover{background:#143d72;}
+
+/* MONTH FILTER */
+.month-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;}
+.mpill{background:var(--off);border:1.5px solid var(--border);color:var(--muted);font-size:12px;font-weight:600;padding:5px 14px;border-radius:20px;cursor:pointer;font-family:inherit;transition:all .15s;}
+.mpill.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+
+/* SEARCH */
+.search-bar{display:flex;gap:8px;margin-bottom:14px;}
+.search-bar input{flex:1;font-size:13px;padding:8px 13px;border:1.5px solid var(--border);border-radius:8px;background:#fff;color:var(--text);outline:none;font-family:inherit;}
+.search-bar input:focus{border-color:var(--blue);}
+
+@media(max-width:800px){
+  .metrics{grid-template-columns:repeat(2,1fr);}
+  .field-grid{grid-template-columns:1fr 1fr;}
+  .exec-kpis{grid-template-columns:repeat(2,1fr);}
+  .abbr-grid{grid-template-columns:repeat(2,1fr);}
+  .srca-stats{display:none;}
+  .page{padding:14px 16px;}
+  .ntab{font-size:11px;padding:6px 10px;}
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-brand">
+    <div class="nav-logo">THC</div>
+    <div>
+      <div class="nav-title">SRCA Hospital Time Dashboard</div>
+      <div class="nav-sub">AlphaStar Aviation Services · Aeromedical Program</div>
+    </div>
+  </div>
+  <div class="nav-tabs">
+    <button class="ntab active" onclick="showPage('dashboard')">Executive View</button>
+    <button class="ntab" onclick="showPage('bases')">SRCA Bases & Map</button>
+    <button class="ntab" onclick="showPage('ops')">Ops & Data Entry</button>
+    <button class="ntab" onclick="showPage('connect')">Connect Data</button>
+  </div>
+</nav>
+
+<div id="pin-tooltip" class="pin-tooltip"></div>
+
+<!-- ===== EXECUTIVE VIEW ===== -->
+<div id="page-dashboard" class="page active">
+  <div class="hero">
+    <div class="hero-top">
+      <div class="hero-badge">LIVE — JAN–APR 2026</div>
+      <div class="hero-right">
+        <span class="hero-month">Target: 10 min · KPI Threshold</span>
+      </div>
+    </div>
+    <h1>Hospital Handover Time — Executive Report</h1>
+    <p>SRCA Aeromedical Program · 8 bases · AlphaStar Aviation Services · Target: ≤ 10 min per handover</p>
+  </div>
+
+  <div id="status-area"></div>
+
+  <div class="metrics">
+    <div class="metric blue">
+      <div class="mlabel">Fleet Average</div>
+      <div class="mval" id="m-avg">—</div>
+      <div class="msub">all 8 bases</div>
+    </div>
+    <div class="metric green">
+      <div class="mlabel">Best Base</div>
+      <div class="mval" id="m-best">—</div>
+      <div class="msub" id="m-best-name">—</div>
+    </div>
+    <div class="metric red">
+      <div class="mlabel">Priority Base</div>
+      <div class="mval" id="m-worst">—</div>
+      <div class="msub" id="m-worst-name">—</div>
+    </div>
+    <div class="metric amber">
+      <div class="mlabel">Exceeding 10 min</div>
+      <div class="mval" id="m-over10">—</div>
+      <div class="msub" id="m-over10-pct">of completed missions</div>
+    </div>
+    <div class="metric">
+      <div class="mlabel">Total Missions</div>
+      <div class="mval" id="m-miss">—</div>
+      <div class="msub" id="m-ontarget">—</div>
+    </div>
+  </div>
+
+  <!-- Executive bar section -->
+  <div id="exec-block"></div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Base performance ranking</h2>
+      <div class="avg-pill">
+        <div class="avg-dot"></div>
+        <span id="fleet-lbl">Avg: — min</span>
+      </div>
+    </div>
+    <table class="rtable">
+      <thead>
+        <tr>
+          <th style="width:28px;">#</th>
+          <th>Base</th>
+          <th>Hospital Time</th>
+          <th class="r">Missions</th>
+          <th class="r">>10 min</th>
+          <th class="r">vs Target</th>
+          <th class="r">Status</th>
+        </tr>
+      </thead>
+      <tbody id="rank-body">
+        <tr><td colspan="7" style="text-align:center;padding:28px;color:var(--muted);font-size:14px;">Loading data…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Time distribution across bases</h2></div>
+    <div class="chart-wrap"><canvas id="barChart"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Export report</h2></div>
+    <div class="export-row">
+      <button class="btn-navy" onclick="exportPDF()">⬇ Download PDF Report</button>
+      <button class="btn-out" onclick="exportCSV()">Export CSV</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin-top:10px;">PDF includes ranked table, KPIs, and fleet benchmark — ready for leadership briefings.</p>
+  </div>
+</div>
+
+<!-- ===== BASES & MAP ===== -->
+<div id="page-bases" class="page">
+  <div class="srca-header">
+    <svg width="68" height="68" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;">
+      <circle cx="100" cy="100" r="97" fill="#fff" stroke="#cc2020" stroke-width="6"/>
+      <circle cx="100" cy="100" r="90" fill="#cc2020"/>
+      <circle cx="118" cy="88" r="72" fill="#fff"/>
+      <circle cx="100" cy="105" r="52" fill="#fff"/>
+      <rect x="97" y="115" width="6" height="24" rx="3" fill="#1a6b1a"/>
+      <ellipse cx="100" cy="108" rx="22" ry="7" fill="#228b22" transform="rotate(-20,100,108)"/>
+      <ellipse cx="100" cy="108" rx="22" ry="7" fill="#228b22" transform="rotate(20,100,108)"/>
+      <ellipse cx="100" cy="105" rx="16" ry="6" fill="#2ea82e"/>
+      <line x1="75" y1="148" x2="98" y2="118" stroke="#c8a84b" stroke-width="3.5" stroke-linecap="round"/>
+      <line x1="125" y1="148" x2="102" y2="118" stroke="#c8a84b" stroke-width="3.5" stroke-linecap="round"/>
+    </svg>
+    <div class="srca-text">
+      <h2>Saudi Red Crescent Authority — SRCA</h2>
+      <p>هيئة الهلال الأحمر السعودي · Emergency Medical Services · Air Ambulance Operations<br>
+      AlphaStar Aviation Services — Aeromedical Partner · Click any base pin to explore</p>
+    </div>
+    <div class="srca-stats">
+      <div class="srca-stat"><div class="srca-stat-v">8</div><div class="srca-stat-l">Active bases</div></div>
+      <div class="srca-stat"><div class="srca-stat-v" id="map-total-miss">—</div><div class="srca-stat-l">Missions</div></div>
+      <div class="srca-stat"><div class="srca-stat-v" id="map-avg">—</div><div class="srca-stat-l">Avg min</div></div>
+    </div>
+  </div>
+
+  <!-- Abbreviation legend -->
+  <div class="card" style="margin-bottom:18px;">
+    <div class="card-head"><h2>Base Location Abbreviations</h2></div>
+    <div class="abbr-grid">
+      <div class="abbr-item"><span class="abbr-code">OEGN</span><span class="abbr-name">Jizan Base</span></div>
+      <div class="abbr-item"><span class="abbr-code">OEGS</span><span class="abbr-name">Qassim Base</span></div>
+      <div class="abbr-item"><span class="abbr-code">OEHL</span><span class="abbr-name">Hail Base</span></div>
+      <div class="abbr-item"><span class="abbr-code">OEJF</span><span class="abbr-name">Jeddah Base</span></div>
+      <div class="abbr-item"><span class="abbr-code">XJAB</span><span class="abbr-name">Arafat Base</span></div>
+      <div class="abbr-item"><span class="abbr-code">XMSM</span><span class="abbr-name">Madina Base</span></div>
+      <div class="abbr-item"><span class="abbr-code">XRRC</span><span class="abbr-name">Aljandriyah Base</span></div>
+      <div class="abbr-item"><span class="abbr-code">OEJB</span><span class="abbr-name">Jubail Base</span></div>
+    </div>
+  </div>
+
+  <div class="map-wrap">
+    <div class="card-head" style="margin-bottom:12px;">
+      <h2>Base locations — Kingdom of Saudi Arabia</h2>
+      <span style="font-size:12px;color:var(--muted);">Click any pin · Avg time + hospitals shown below</span>
+    </div>
+    <div style="position:relative;min-height:460px;background:#daeef7;border-radius:10px;overflow:hidden;">
+      <div id="map-loading" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:#7a9eb8;font-size:13px;font-family:'DM Sans',sans-serif;">Loading map…</div>
+      <div id="d3-map" style="width:100%;"></div>
+    </div>
+    <div class="map-legend">
+      <div class="leg-item"><div class="leg-dot" style="background:#059669;"></div><span>On target (≤10 min)</span></div>
+      <div class="leg-item"><div class="leg-dot" style="background:#2563eb;"></div><span>Near target (≤15 min)</span></div>
+      <div class="leg-item"><div class="leg-dot" style="background:#d97706;"></div><span>Watch (≤20 min)</span></div>
+      <div class="leg-item"><div class="leg-dot" style="background:#dc2626;"></div><span>Priority (&gt;20 min)</span></div>
+      <div class="leg-hint">Click a pin for base details</div>
+    </div>
+  </div>
+
+  <div id="base-detail-card" class="base-detail-card">
+    <div class="detail-top">
+      <div>
+        <div id="detail-name" style="font-size:19px;font-weight:800;"></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px;">SRCA Aeromedical Base · Click another pin to switch</div>
+      </div>
+      <span id="detail-badge" class="badge"></span>
+    </div>
+    <div id="detail-abbr" class="base-abbr-note"></div>
+    <div class="detail-grid" id="detail-metrics"></div>
+    <div id="detail-hospitals"></div>
+    <div class="missions-section" id="detail-missions"></div>
+  </div>
+</div>
+
+<!-- ===== OPS & DATA ENTRY ===== -->
+<div id="page-ops" class="page">
+  <div class="hero" style="margin-bottom:18px;">
+    <div class="hero-top">
+      <div class="hero-badge">OPERATIONAL VIEW</div>
+      <div class="hero-right"><span class="hero-month">Aseel F. Al Orifi · Hussain Alsallum</span></div>
+    </div>
+    <h1>Mission Data Entry & Review</h1>
+    <p>View all missions · Edit missing fields · Updates write back to Google Sheet · KPI flags shown for &gt;10 min handovers</p>
+  </div>
+
+  <div id="status-area-ops"></div>
+
+  <div class="month-pills" id="month-pills">
+    <button class="mpill active" onclick="filterMonth('ALL')">All Months</button>
+    <button class="mpill" onclick="filterMonth('JAN26')">January 2026</button>
+    <button class="mpill" onclick="filterMonth('FEB26')">February 2026</button>
+    <button class="mpill" onclick="filterMonth('March26')">March 2026</button>
+    <button class="mpill" onclick="filterMonth('April26')">April 2026</button>
+  </div>
+
+  <div class="search-bar">
+    <input type="text" id="mission-search" placeholder="Search by call number, base, hospital, report #…" oninput="renderMissionList()">
+    <button class="btn-blue" onclick="renderMissionList()">Search</button>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <h2>Completed Missions</h2>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="kpi-flag">🔴 >10 min flagged</span>
+        <span id="mission-count" style="font-size:12px;color:var(--muted);"></span>
+      </div>
+    </div>
+    <div id="mission-list"></div>
+  </div>
+
+  <!-- Edit form -->
+  <div id="edit-section" class="ops-section" style="display:none;">
+    <div class="ops-section-title">
+      <h2>Edit Mission Record</h2>
+      <span class="ops-badge" id="edit-call-badge">—</span>
+      <span id="edit-over10-flag"></span>
+    </div>
+
+    <div class="field-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:6px;">
+      <div class="field"><label>Report #</label><input id="ef-report" class="readonly-field" readonly></div>
+      <div class="field"><label>DOF</label><input id="ef-dof" class="readonly-field" readonly></div>
+      <div class="field"><label>Mission Status</label><input id="ef-status" class="readonly-field" readonly></div>
+      <div class="field"><label>Mission</label><input id="ef-mission" class="readonly-field" readonly></div>
+      <div class="field"><label>A/C Reg</label><input id="ef-acreg" class="readonly-field" readonly></div>
+      <div class="field"><label>Location (Abbr.)</label><input id="ef-location" class="readonly-field" readonly></div>
+      <div class="field"><label>Hospital Time (min)</label><input id="ef-hosptime" class="readonly-field" readonly></div>
+      <div class="field"><label>Hospital Time &gt;10</label><input id="ef-over10" class="readonly-field" readonly></div>
+      <div class="field"><label>Customer</label><input id="ef-customer" class="readonly-field" readonly></div>
+    </div>
+
+    <div style="height:1px;background:var(--border);margin:14px 0;"></div>
+    <p style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:10px;letter-spacing:.04em;text-transform:uppercase;">Fields to complete ↓</p>
+
+    <div class="field-grid">
+      <div class="field"><label>Alpha Star Call #</label><input id="ef-call" placeholder="e.g. 13163-2026"></div>
+      <div class="field"><label>Base Name</label>
+        <select id="ef-base">
+          <option value="">Select base…</option>
+          <option>Jizan Base</option><option>Qassim Base</option><option>Hail Base</option>
+          <option>Jeddah Base</option><option>Arafat Base</option><option>Madina Base</option>
+          <option>Aljandriyah Base</option><option>Jubail Base</option>
+        </select>
+      </div>
+      <div class="field"><label>Receiving Hospital</label><input id="ef-hospital" placeholder="Hospital name"></div>
+      <div class="field"><label>Handover Location</label>
+        <select id="ef-handloc">
+          <option value="">Select…</option>
+          <option>ED</option><option>ICU</option><option>Cath Lab</option><option>Helipad</option>
+          <option>OR</option><option>Ward</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field"><label>Sub-category / Justification</label>
+        <select id="ef-subcat">
+          <option value="">Select…</option>
+          <option>Accompanying patient (No Staff or No Equipment)</option>
+          <option>Handover process</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="field"><label>Hospital Has Helipad?</label>
+        <select id="ef-helipad">
+          <option value="">Select…</option>
+          <option>Yes</option><option>No → Alt Helipad</option>
+        </select>
+      </div>
+      <div class="field"><label>Helipad Adjacent to ER?</label>
+        <select id="ef-heliadj">
+          <option value="">Select…</option>
+          <option>Yes</option><option>No</option>
+        </select>
+      </div>
+      <div class="field"><label>ER Team Arrives to Receive?</label>
+        <select id="ef-erteam">
+          <option value="">Select…</option>
+          <option>Yes</option><option>No</option><option>Ambulance Only</option>
+        </select>
+      </div>
+      <div class="field"><label>Risk Stratification</label>
+        <select id="ef-risk">
+          <option value="">Select…</option>
+          <option>Low</option><option>Medium</option><option>High</option><option>Critical</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field" style="margin-bottom:12px;">
+      <label>Comments</label>
+      <textarea id="ef-comments" placeholder="Add any relevant notes, observations, or delay explanations…"></textarea>
+    </div>
+
+    <div class="save-row">
+      <button class="btn-save" onclick="saveRecord()">💾 Save to Google Sheet</button>
+      <button class="btn-cancel" onclick="closeEdit()">Cancel</button>
+      <span class="save-note" id="save-msg"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CONNECT DATA ===== -->
+<div id="page-connect" class="page">
+  <div class="conn-hero">
+    <h2>Connect Live Data</h2>
+    <p>Link your Google Sheet to power the dashboard with real-time data</p>
+  </div>
+  <div class="conn-card">
+    <h3>Google Sheet URL</h3>
+    <p>Set sharing to <strong>"Anyone with the link can view"</strong>. The dashboard will read all 4 month-sheets automatically.</p>
+    <div class="inp-row">
+      <input type="text" id="sheet-url" placeholder="https://docs.google.com/spreadsheets/d/…" value="https://docs.google.com/spreadsheets/d/1422C26pQJIgqM-uonCvdan97MAjnMbTmmVsnYssJ85E/edit?usp=sharing"/>
+      <button class="btn-blue" onclick="loadSheet()">Connect</button>
+      <button class="btn-demo" onclick="loadDemo()">Load Demo</button>
+    </div>
+    <div class="col-hint">
+      <p>Sheet names expected: <code>JAN26</code> · <code>FEB26</code> · <code>March26</code> · <code>April26</code><br>
+      Required columns: <code>BASE NAME</code> · <code>Hospital Time</code> · <code>Alpha Star Call#</code> · <code>Mission Status</code></p>
+    </div>
+  </div>
+  <div class="conn-card">
+    <h3>How it works</h3>
+    <div class="steps-grid">
+      <div class="step-box">
+        <div class="step-num">1</div>
+        <h4>Export from THC / Alpha Data</h4>
+        <p>Ensure your Google Sheet has the standard column headers across JAN26, FEB26, March26, April26 sheets.</p>
+      </div>
+      <div class="step-box">
+        <div class="step-num">2</div>
+        <h4>Set sharing to "View"</h4>
+        <p>Share → Anyone with link → Viewer. This keeps data safe while allowing the dashboard to read it live.</p>
+      </div>
+      <div class="step-box">
+        <div class="step-num">3</div>
+        <h4>Paste & connect</h4>
+        <p>Copy the sheet URL, paste above, and click Connect. All charts, map, and mission list update instantly.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+var TARGET = 10;
+var SHEET_ID = '1422C26pQJIgqM-uonCvdan97MAjnMbTmmVsnYssJ85E';
+var API_KEY = ''; // Optional — not needed for public sheets via gviz
+
+var BASE_GEO = {
+  'Jeddah Base':      [39.19, 21.49],
+  'Madina Base':      [39.61, 24.47],
+  'Hail Base':        [41.69, 27.51],
+  'Qassim Base':      [43.97, 26.33],
+  'Aljandriyah Base': [46.81, 24.93],
+  'Jubail Base':      [49.66, 27.01],
+  'Jizan Base':       [42.55, 16.89],
+  'Arafat Base':      [39.98, 21.35],
+};
+
+var ABBR_MAP = {
+  'OEGN':'Jizan Base','OEGS':'Qassim Base','OEHL':'Hail Base','OEJF':'Jeddah Base',
+  'XJAB':'Arafat Base','XMSM':'Madina Base','XRRC':'Aljandriyah Base','OEJB':'Jubail Base'
+};
+
+var SHEET_MONTHS = ['JAN26','FEB26','March26','April26'];
+var MONTH_LABELS = {'JAN26':'January 2026','FEB26':'February 2026','March26':'March 2026','April26':'April 2026'};
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+var allMissions = [];   // flat array of all rows across all sheets
+var baseData = [];      // aggregated by base
+var chartInst = null;
+var d3Projection = null;
+var mapInitialized = false;
+var currentEditRow = null;
+var activeMonth = 'ALL';
+
+var DEMO_MISSIONS = [
+  {sheet:'JAN26',dof:'1/1/2026',customer:'Red Crescent',report:'40',call:'13163-2026',mission:'REMS121',acreg:'HZ-RC22',location:'OEGN',base:'Jizan Base',hospital:'King Fahad Hospital',handloc:'ED',hosptime:16,over10:'Yes',status:'COMPLETED',age:15,gender:'M',patients:1,maincat:'',subcat:'Accompanying patient (No Staff or No Equipment)',helipad:'Yes',heliadj:'No',erteam:'Ambulance Only',comments:'',risk:''},
+  {sheet:'JAN26',dof:'1/1/2026',customer:'Red Crescent',report:'163',call:'13165-2026',mission:'REMS121',acreg:'HZ-RC24',location:'OEJB',base:'Jubail Base',hospital:'Jubail General Hospital',handloc:'ED',hosptime:22,over10:'Yes',status:'COMPLETED',age:45,gender:'M',patients:1,maincat:'',subcat:'Accompanying patient (No Staff or No Equipment)',helipad:'Yes',heliadj:'No',erteam:'No',comments:'',risk:''},
+  {sheet:'JAN26',dof:'1/4/2026',customer:'Red Crescent',report:'769309',call:'13180-2026',mission:'REMS121',acreg:'HZ-RC8',location:'OEJF',base:'Jeddah Base',hospital:'King Abdullah Medical Complex',handloc:'Helipad',hosptime:12,over10:'Yes',status:'COMPLETED',age:40,gender:'M',patients:1,maincat:'',subcat:'Handover process',helipad:'Yes',heliadj:'No',erteam:'Yes',comments:'',risk:''},
+  {sheet:'JAN26',dof:'1/4/2026',customer:'Red Crescent',report:'305',call:'13184-2026',mission:'REMS121',acreg:'HZ-RC25',location:'OEHL',base:'Hail Base',hospital:'King Khalid Hospital',handloc:'ED',hosptime:50,over10:'Yes',status:'COMPLETED',age:25,gender:'M',patients:1,maincat:'',subcat:'Accompanying patient (No Staff or No Equipment)',helipad:'Yes',heliadj:'No',erteam:'Yes',comments:'Approximately 1-200 meters from the helipad',risk:''},
+  {sheet:'FEB26',dof:'2/3/2026',customer:'Red Crescent',report:'801234',call:'13400-2026',mission:'REMS121',acreg:'HZ-RC26',location:'OEGS',base:'Qassim Base',hospital:'Buraydah Central Hospital',handloc:'ED',hosptime:25,over10:'Yes',status:'COMPLETED',age:30,gender:'M',patients:1,maincat:'',subcat:'Accompanying patient (No Staff or No Equipment)',helipad:'Yes',heliadj:'Yes',erteam:'No',comments:'',risk:''},
+  {sheet:'FEB26',dof:'2/5/2026',customer:'Red Crescent',report:'802000',call:'13410-2026',mission:'REMS121',acreg:'HZ-RC9',location:'XMSM',base:'Madina Base',hospital:'King Fahad hospital',handloc:'ED',hosptime:30,over10:'Yes',status:'COMPLETED',age:43,gender:'M',patients:1,maincat:'',subcat:'Accompanying patient (No Staff or No Equipment)',helipad:'Yes',heliadj:'No',erteam:'Ambulance Only',comments:'',risk:''},
+  {sheet:'March26',dof:'3/2/2026',customer:'Red Crescent',report:'850123',call:'',mission:'REMS121',acreg:'HZ-RC33',location:'XJAB',base:'Arafat Base',hospital:'AL-Noor Specialized Hospital',handloc:'Helipad',hosptime:27,over10:'Yes',status:'COMPLETED',age:43,gender:'M',patients:1,maincat:'',subcat:'Handover process',helipad:'No → Alt Helipad',heliadj:'No',erteam:'Yes',comments:'Ambulance Delay / 20 mins',risk:''},
+  {sheet:'April26',dof:'4/1/2026',customer:'Red Crescent',report:'900001',call:'13600-2026',mission:'AMBLNC121',acreg:'HZ-RC72',location:'XRRC',base:'Aljandriyah Base',hospital:'National Guard Hospital - Riyadh',handloc:'ED',hosptime:65,over10:'Yes',status:'COMPLETED',age:18,gender:'F',patients:1,maincat:'',subcat:'Accompanying patient (No Staff or No Equipment)',helipad:'Yes',heliadj:'No',erteam:'No',comments:'Inter Facility Transport (IFT)',risk:'Waiting for a bed'},
+];
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function getColor(t) {
+  if (t <= TARGET)    return '#059669';
+  if (t <= 15)        return '#2563eb';
+  if (t <= 20)        return '#d97706';
+  return '#dc2626';
+}
+function getStatus(t) {
+  if (t <= TARGET) return {label:'On target', cls:'good'};
+  if (t <= 15)     return {label:'Near target', cls:'ok'};
+  if (t <= 20)     return {label:'Watch', cls:'warn'};
+  return                  {label:'Priority', cls:'bad'};
+}
+function safe(v) { return (v === null || v === undefined) ? '' : String(v).trim(); }
+
+function setStatus(type, msg, target) {
+  var id = target || 'status-area';
+  document.getElementById(id).innerHTML =
+    '<div class="status-bar ' + type + '"><div class="sdot"></div><span>' + msg + '</span>' +
+    (type === 'ok' ? '<button class="rfbtn" onclick="loadSheet()">Refresh</button>' : '') + '</div>';
+}
+
+function showPage(p) {
+  document.querySelectorAll('.page').forEach(function(x){ x.classList.remove('active'); });
+  document.querySelectorAll('.ntab').forEach(function(x){ x.classList.remove('active'); });
+  document.getElementById('page-'+p).classList.add('active');
+  var map = {dashboard:0,bases:1,ops:2,connect:3};
+  document.querySelectorAll('.ntab')[map[p]].classList.add('active');
+  if (p === 'bases' && baseData.length) setTimeout(function(){ if (!mapInitialized) initD3Map(renderPins); else renderPins(); }, 50);
+  if (p === 'ops') renderMissionList();
+}
+
+// ── BUILD BASE AGGREGATES ──────────────────────────────────────────────────
+function buildBaseData() {
+  var seen = {};
+  allMissions.forEach(function(r) {
+    var b = safe(r.base);
+    if (!b || b === 'N/A') return;
+    var t = parseFloat(r.hosptime);
+    if (isNaN(t)) return;
+    var over = safe(r.over10).toUpperCase() === 'YES';
+    if (!seen[b]) seen[b] = {base:b, sum:0, n:0, over10:0, missions:0, hospitals:{}};
+    seen[b].sum += t; seen[b].n++; seen[b].missions++;
+    if (over) seen[b].over10++;
+    var h = safe(r.hospital);
+    if (h && h !== 'N/A') seen[b].hospitals[h] = (seen[b].hospitals[h]||0) + 1;
+  });
+  baseData = Object.values(seen).map(function(d) {
+    return {
+      base: d.base, time: parseFloat((d.sum/d.n).toFixed(1)),
+      missions: d.missions, over10: d.over10,
+      hospitals: Object.entries(d.hospitals).sort(function(a,b){return b[1]-a[1];}),
+    };
+  });
+}
+
+// ── RENDER DASHBOARD ───────────────────────────────────────────────────────
+function render() {
+  buildBaseData();
+  var sorted = [...baseData].sort(function(a,b){ return a.time - b.time; });
+  var maxT   = Math.max.apply(null, baseData.map(function(d){ return d.time; }));
+  var avg    = (baseData.reduce(function(s,d){ return s+d.time; },0) / baseData.length).toFixed(1);
+  var total  = baseData.reduce(function(s,d){ return s+d.missions; },0);
+  var totalOver10 = baseData.reduce(function(s,d){ return s+d.over10; },0);
+  var pctOver10 = total ? Math.round(totalOver10/total*100) : 0;
+
+  document.getElementById('m-avg').textContent = avg + ' min';
+  document.getElementById('m-best').textContent = sorted[0].time + ' min';
+  document.getElementById('m-best-name').textContent = sorted[0].base;
+  document.getElementById('m-worst').textContent = sorted[sorted.length-1].time + ' min';
+  document.getElementById('m-worst-name').textContent = sorted[sorted.length-1].base;
+  document.getElementById('m-miss').textContent = total.toLocaleString();
+  document.getElementById('m-ontarget').textContent = (baseData.filter(function(d){return d.time<=TARGET;}).length)+' of '+baseData.length+' on target';
+  document.getElementById('m-over10').textContent = totalOver10.toLocaleString();
+  document.getElementById('m-over10-pct').textContent = pctOver10 + '% of ' + total + ' completed';
+  document.getElementById('fleet-lbl').textContent = 'Fleet Avg: ' + avg + ' min';
+  document.getElementById('map-avg').textContent = avg;
+  document.getElementById('map-total-miss').textContent = total;
+
+  // Executive bars
+  var execBars = sorted.map(function(d) {
+    var w = (d.time / maxT * 100).toFixed(1);
+    var col = getColor(d.time);
+    return '<div class="exec-bar-row">' +
+      '<span class="exec-bar-name">'+d.base+'</span>' +
+      '<div class="exec-bar-bg"><div class="exec-bar-fill" style="width:'+w+'%;background:'+col+'"></div></div>' +
+      '<span class="exec-bar-val" style="color:'+col+'">'+d.time+' min</span>' +
+      '</div>';
+  }).join('');
+  document.getElementById('exec-block').innerHTML =
+    '<div class="exec-section">' +
+    '<div class="exec-title">EXECUTIVE SUMMARY</div>' +
+    '<div class="exec-sub">Hospital Handover Time · Jan–Apr 2026 · KPI: ≤ 10 min · Target: 20% improvement per cycle</div>' +
+    '<div class="exec-kpis">' +
+    '<div class="exec-kpi"><div class="exec-kpi-l">Fleet Avg</div><div class="exec-kpi-v">'+avg+' min</div><div class="exec-kpi-s">all 8 bases</div></div>' +
+    '<div class="exec-kpi"><div class="exec-kpi-l">Best Base</div><div class="exec-kpi-v" style="color:#6ee7b7">'+sorted[0].base+'</div><div class="exec-kpi-s">'+sorted[0].time+' min</div></div>' +
+    '<div class="exec-kpi"><div class="exec-kpi-l">Priority Base</div><div class="exec-kpi-v" style="color:#fca5a5">'+sorted[sorted.length-1].base+'</div><div class="exec-kpi-s">'+sorted[sorted.length-1].time+' min</div></div>' +
+    '<div class="exec-kpi"><div class="exec-kpi-l">&gt;10 min Rate</div><div class="exec-kpi-v" style="color:#fde68a">'+pctOver10+'%</div><div class="exec-kpi-s">'+totalOver10+' of '+total+' missions</div></div>' +
+    '</div>' +
+    '<div class="exec-bars">'+execBars+'</div></div>';
+
+  // Ranking table
+  document.getElementById('rank-body').innerHTML = sorted.map(function(d,i) {
+    var pct = (d.time/maxT*100).toFixed(1);
+    var st  = getStatus(d.time);
+    var diff = d.time - TARGET;
+    var vs = diff<=0 ? '<span class="vs-dn">▼ '+Math.abs(diff).toFixed(1)+' min</span>' : '<span class="vs-up">▲ '+diff.toFixed(1)+' min</span>';
+    var o10pct = d.missions ? Math.round(d.over10/d.missions*100) : 0;
+    return '<tr>' +
+      '<td class="rnum">'+(i+1)+'</td>' +
+      '<td><span class="bname">'+d.base+'</span></td>' +
+      '<td><div class="bar-wrap"><div class="bar-bg"><div class="bar-fill" style="width:'+pct+'%;background:'+getColor(d.time)+'"></div></div><span class="bar-val" style="color:'+getColor(d.time)+'">'+d.time+' min</span></div></td>' +
+      '<td style="text-align:right;">'+d.missions+'</td>' +
+      '<td style="text-align:right;"><span style="color:'+( o10pct>80?'#dc2626':o10pct>50?'#d97706':'#059669' )+';font-weight:700;">'+d.over10+' ('+o10pct+'%)</span></td>' +
+      '<td style="text-align:right;">'+vs+'</td>' +
+      '<td style="text-align:right;"><span class="badge '+st.cls+'">'+st.label+'</span></td>' +
+      '</tr>';
+  }).join('');
+
+  // Chart
+  if (chartInst) chartInst.destroy();
+  chartInst = new Chart(document.getElementById('barChart'), {
+    type:'bar',
+    data:{
+      labels: sorted.map(function(d){ return d.base.replace(' Base',''); }),
+      datasets:[{
+        data: sorted.map(function(d){ return d.time; }),
+        backgroundColor: sorted.map(function(d){ return getColor(d.time); }),
+        borderRadius:6, borderSkipped:false
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return ' '+c.raw+' min';}}}},
+      scales:{
+        y:{beginAtZero:true,ticks:{callback:function(v){return v+' min';},font:{size:12}},grid:{color:'rgba(0,0,0,0.04)'}},
+        x:{ticks:{font:{size:12}},grid:{display:false}}
+      }
+    }
+  });
+  var yS=chartInst.scales.y,xS=chartInst.scales.x,ctx=chartInst.ctx;
+  var origDraw=chartInst.draw.bind(chartInst);
+  chartInst.draw=function(){
+    origDraw();
+    var y=yS.getPixelForValue(TARGET);
+    ctx.save();ctx.setLineDash([5,4]);ctx.strokeStyle='#2d7dd2';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(xS.left,y);ctx.lineTo(xS.right,y);ctx.stroke();
+    ctx.fillStyle='#1a4a8a';ctx.font='bold 11px DM Sans,Arial';
+    ctx.fillText('KPI Target: '+TARGET+' min',xS.right-105,y-6);ctx.restore();
+  };
+  chartInst.draw();
+  renderPins();
+}
+
+// ── D3 MAP ─────────────────────────────────────────────────────────────────
+function initD3Map(callback) {
+  if (mapInitialized){ if(callback) callback(); return; }
+  var container = document.getElementById('d3-map');
+  var W = container.offsetWidth || 860;
+  var H = Math.round(W * 0.56);
+  var svg = d3.select('#d3-map').append('svg')
+    .attr('width','100%').attr('viewBox','0 0 '+W+' '+H)
+    .style('background','#daeef7').style('border-radius','10px');
+  var projection = d3.geoMercator().center([45,22.5]).scale(W*1.72).translate([W/2,H/2]);
+  d3Projection = projection;
+  var path = d3.geoPath().projection(projection);
+  d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json').then(function(world) {
+    document.getElementById('map-loading').style.display='none';
+    var countries = topojson.feature(world,world.objects.countries).features;
+    var neighbors = ['682','400','275','368','414','784','512','887'];
+    svg.append('g').selectAll('path')
+      .data(countries.filter(function(f){ return neighbors.indexOf(String(f.id))>=0&&String(f.id)!=='682'; }))
+      .join('path').attr('d',path).attr('fill','#c8d8e4').attr('stroke','#aabfcc').attr('stroke-width',0.8).attr('opacity',0.5);
+    var ksa = countries.find(function(f){ return String(f.id)==='682'; });
+    if (ksa) svg.append('path').datum(ksa).attr('d',path).attr('fill','#c8dce8').attr('stroke','#7aaabb').attr('stroke-width',1.8);
+    svg.append('text').attr('x',W*.08).attr('y',H*.55).attr('text-anchor','middle').attr('font-size',Math.round(W*.012)).attr('fill','#5a9ec0').attr('font-style','italic').attr('font-family','DM Sans,Arial').attr('transform','rotate(-80,'+(W*.08)+','+(H*.55)+')').text('RED SEA');
+    svg.append('text').attr('x',W*.93).attr('y',H*.35).attr('text-anchor','middle').attr('font-size',Math.round(W*.012)).attr('fill','#5a9ec0').attr('font-style','italic').attr('font-family','DM Sans,Arial').attr('transform','rotate(80,'+(W*.93)+','+(H*.35)+')').text('ARABIAN GULF');
+    var cx=W-44,cy=44;
+    svg.append('circle').attr('cx',cx).attr('cy',cy).attr('r',18).attr('fill','white').attr('stroke','#aacad8').attr('stroke-width',1);
+    svg.append('polygon').attr('points',cx+','+(cy-14)+' '+(cx-2.5)+','+(cy-4)+' '+cx+','+(cy-7)+' '+(cx+2.5)+','+(cy-4)).attr('fill','#1a4a8a');
+    svg.append('polygon').attr('points',cx+','+(cy+14)+' '+(cx-2.5)+','+(cy+4)+' '+cx+','+(cy+7)+' '+(cx+2.5)+','+(cy+4)).attr('fill','#9ab8c8');
+    svg.append('text').attr('x',cx).attr('y',cy-1).attr('text-anchor','middle').attr('font-size',9).attr('font-weight',800).attr('fill','#1a4a8a').attr('font-family','Arial').text('N');
+    svg.append('g').attr('id','d3-pins');
+    mapInitialized=true;
+    if(callback) callback();
+  }).catch(function(){ document.getElementById('map-loading').textContent='Map failed to load.'; });
+}
+
+function renderPins() {
+  initD3Map(function(){
+    var pinsLayer = d3.select('#d3-pins');
+    pinsLayer.selectAll('*').remove();
+    if (!d3Projection||!baseData.length) return;
+    baseData.forEach(function(d) {
+      var geo = BASE_GEO[d.base];
+      if (!geo) return;
+      var col = getColor(d.time);
+      var pt = d3Projection(geo); var px=pt[0],py=pt[1];
+      var lblW = d.base.replace(' Base','').length*6+18;
+      var g = pinsLayer.append('g').style('cursor','pointer');
+      g.append('circle').attr('cx',px).attr('cy',py).attr('r',13).attr('fill',col).attr('opacity',0.15);
+      g.append('circle').attr('cx',px).attr('cy',py).attr('r',7).attr('fill',col).attr('stroke','white').attr('stroke-width',2);
+      g.append('rect').attr('x',px-lblW/2).attr('y',py+10).attr('width',lblW).attr('height',15).attr('rx',4).attr('fill','rgba(255,255,255,0.93)').attr('stroke',col).attr('stroke-width',0.7);
+      g.append('text').attr('x',px).attr('y',py+21).attr('text-anchor','middle').attr('font-size',9.5).attr('font-weight',700).attr('fill','#1a1a2e').attr('font-family','DM Sans,Arial').text(d.base.replace(' Base',''));
+      g.append('text').attr('x',px).attr('y',py-11).attr('text-anchor','middle').attr('font-size',9).attr('font-weight',700).attr('fill',col).attr('font-family','DM Sans,Arial').text(d.time+' min');
+      var abbr = Object.keys(ABBR_MAP).find(function(k){ return ABBR_MAP[k]===d.base; })||'';
+      if(abbr) g.append('text').attr('x',px).attr('y',py-20).attr('text-anchor','middle').attr('font-size',8).attr('fill','rgba(0,0,0,0.4)').attr('font-family','DM Mono,monospace').text(abbr);
+      g.on('mouseenter',function(event){
+        var tt=document.getElementById('pin-tooltip');
+        tt.textContent=d.base+' ('+abbr+')  —  '+d.time+' min  |  '+d.missions+' missions';
+        tt.style.display='block';tt.style.left=(event.clientX+14)+'px';tt.style.top=(event.clientY-10)+'px';
+      }).on('mousemove',function(event){
+        var tt=document.getElementById('pin-tooltip');
+        tt.style.left=(event.clientX+14)+'px';tt.style.top=(event.clientY-10)+'px';
+      }).on('mouseleave',function(){
+        document.getElementById('pin-tooltip').style.display='none';
+      }).on('click',function(){ showBaseDetail(d.base); });
+    });
+  });
+}
+
+function showBaseDetail(name) {
+  var d = baseData.find(function(x){ return x.base===name; });
+  if (!d) return;
+  var st = getStatus(d.time);
+  var diff = d.time - TARGET;
+  var col = getColor(d.time);
+  var abbr = Object.keys(ABBR_MAP).find(function(k){ return ABBR_MAP[k]===name; })||'—';
+
+  document.getElementById('detail-name').textContent = name;
+  var badge = document.getElementById('detail-badge');
+  badge.textContent = st.label; badge.className = 'badge '+st.cls;
+  document.getElementById('detail-abbr').innerHTML =
+    'ICAO Abbreviation: <strong>'+abbr+'</strong> &nbsp;·&nbsp; '+name+' &nbsp;·&nbsp; Kingdom of Saudi Arabia';
+  document.getElementById('detail-metrics').innerHTML =
+    '<div class="metric"><div class="mlabel">Avg Hospital Time</div><div class="mval" style="color:'+col+'">'+d.time+' min</div></div>' +
+    '<div class="metric"><div class="mlabel">vs KPI Target</div><div class="mval" style="color:'+(diff<=0?'#059669':'#dc2626')+'">'+(diff<=0?'▼':'▲')+' '+Math.abs(diff).toFixed(1)+' min</div></div>' +
+    '<div class="metric"><div class="mlabel">Completed Missions</div><div class="mval">'+d.missions+'</div></div>' +
+    '<div class="metric"><div class="mlabel">&gt;10 min Handovers</div><div class="mval" style="color:var(--amber)">'+d.over10+'</div><div class="msub">'+(d.missions?Math.round(d.over10/d.missions*100):0)+'% of missions</div></div>';
+
+  // Hospitals
+  var hHtml = '';
+  if (d.hospitals.length) {
+    hHtml = '<p style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:8px;letter-spacing:.04em;text-transform:uppercase;">Receiving Hospitals</p>';
+    hHtml += '<table class="hosp-table"><thead><tr><th>Hospital</th><th>Missions</th></tr></thead><tbody>';
+    d.hospitals.forEach(function(h){ hHtml += '<tr><td>'+h[0]+'</td><td>'+h[1]+'</td></tr>'; });
+    hHtml += '</tbody></table>';
+  } else {
+    hHtml = '<p style="font-size:13px;color:var(--muted);margin-top:10px;">No hospital data available for this base yet.</p>';
+  }
+  document.getElementById('detail-hospitals').innerHTML = hHtml;
+
+  // Missions for this base with >10 flag
+  var baseMissions = allMissions.filter(function(r){ return safe(r.base)===name && safe(r.status).toUpperCase()==='COMPLETED'; });
+  var mHtml = '';
+  if (baseMissions.length) {
+    mHtml = '<p style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:10px;letter-spacing:.04em;text-transform:uppercase;">Recent Completed Missions</p>';
+    baseMissions.slice(0,10).forEach(function(r) {
+      var over = safe(r.over10).toUpperCase()==='YES';
+      mHtml += '<div class="mission-row'+(over?' over10':'')+'">'+
+        '<span class="m-call">'+(safe(r.call)||'—')+'</span>'+
+        '<span style="font-size:12px;color:var(--muted);">'+safe(r.dof)+'</span>'+
+        '<span style="font-size:13px;">'+safe(r.hospital)+'</span>'+
+        '<span style="font-size:13px;font-weight:700;color:'+(over?'var(--red)':'var(--green)')+'">'+
+        (r.hosptime !== undefined && r.hosptime !== '' ? r.hosptime+' min' : '—')+'</span>'+
+        (over ? '<span class="kpi-flag">KPI ⚠</span>' : '<span></span>')+
+        '<button class="m-edit-btn" onclick="openEdit('+JSON.stringify(r).replace(/"/g,"'")+')" >Edit</button>'+
+        '</div>';
+    });
+  }
+  document.getElementById('detail-missions').innerHTML = mHtml;
+
+  var card = document.getElementById('base-detail-card');
+  card.style.display='block';
+  card.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ── MISSION LIST (OPS VIEW) ───────────────────────────────────────────────
+function filterMonth(m) {
+  activeMonth = m;
+  document.querySelectorAll('.mpill').forEach(function(el){ el.classList.remove('active'); });
+  event.target.classList.add('active');
+  renderMissionList();
+}
+
+function renderMissionList() {
+  var q = document.getElementById('mission-search').value.toLowerCase();
+  var missions = allMissions.filter(function(r){
+    if (safe(r.status).toUpperCase() !== 'COMPLETED') return false;
+    if (activeMonth !== 'ALL' && r.sheet !== activeMonth) return false;
+    if (q) {
+      var str = [r.call,r.base,r.hospital,r.report,r.handloc,r.subcat].map(safe).join(' ').toLowerCase();
+      if (!str.includes(q)) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('mission-count').textContent = missions.length + ' missions shown';
+
+  if (!missions.length) {
+    document.getElementById('mission-list').innerHTML = '<p style="text-align:center;padding:28px;color:var(--muted);font-size:14px;">No missions match the current filter.</p>';
+    return;
+  }
+
+  var html = '<table class="rtable"><thead><tr>'+
+    '<th>Call #</th><th>Date</th><th>Base</th><th>Hospital</th><th>Handloc</th><th>Time</th><th>Justification</th><th></th>'+
+    '</tr></thead><tbody>';
+  missions.forEach(function(r) {
+    var over = safe(r.over10).toUpperCase()==='YES';
+    var tStr = (r.hosptime !== undefined && r.hosptime !== '') ? r.hosptime+' min' : '—';
+    var flag = over ? '<span class="kpi-flag">⚠ KPI</span>' : '';
+    var callDisp = safe(r.call) || '<span style="color:#d97706;font-size:11px;font-weight:700;">MISSING</span>';
+    html += '<tr'+(over?' style="background:#fff8f8;"':'')+'>'+
+      '<td><span class="m-call">'+callDisp+'</span></td>'+
+      '<td style="font-size:12px;color:var(--muted);">'+safe(r.dof)+'</td>'+
+      '<td>'+safe(r.base)+'</td>'+
+      '<td style="font-size:13px;">'+safe(r.hospital)+'</td>'+
+      '<td>'+safe(r.handloc)+'</td>'+
+      '<td><strong style="color:'+(over?'var(--red)':'var(--green)')+'">'+tStr+'</strong> '+flag+'</td>'+
+      '<td style="font-size:12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+safe(r.subcat)+'</td>'+
+      '<td><button class="m-edit-btn" onclick=\'openEdit('+JSON.stringify(r)+')\'>Edit</button></td>'+
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('mission-list').innerHTML = html;
+}
+
+// ── EDIT FORM ──────────────────────────────────────────────────────────────
+function openEdit(r) {
+  currentEditRow = r;
+  var over = safe(r.over10).toUpperCase()==='YES';
+  document.getElementById('edit-call-badge').textContent = safe(r.call)||'Missing Call #';
+  document.getElementById('edit-over10-flag').innerHTML = over ? '<span class="kpi-flag">⚠ Hospital Time > 10 min — Justification Required</span>' : '';
+
+  // Read-only fields
+  document.getElementById('ef-report').value = safe(r.report);
+  document.getElementById('ef-dof').value = safe(r.dof);
+  document.getElementById('ef-status').value = safe(r.status);
+  document.getElementById('ef-mission').value = safe(r.mission);
+  document.getElementById('ef-acreg').value = safe(r.acreg);
+  document.getElementById('ef-location').value = safe(r.location)+' → '+(ABBR_MAP[safe(r.location)]||'');
+  document.getElementById('ef-hosptime').value = r.hosptime !== undefined ? r.hosptime+' min' : '—';
+  document.getElementById('ef-over10').value = safe(r.over10);
+  document.getElementById('ef-customer').value = safe(r.customer);
+
+  // Editable
+  document.getElementById('ef-call').value = safe(r.call);
+  document.getElementById('ef-base').value = safe(r.base);
+  document.getElementById('ef-hospital').value = safe(r.hospital);
+  document.getElementById('ef-handloc').value = safe(r.handloc);
+  document.getElementById('ef-subcat').value = safe(r.subcat);
+  document.getElementById('ef-helipad').value = safe(r.helipad);
+  document.getElementById('ef-heliadj').value = safe(r.heliadj);
+  document.getElementById('ef-erteam').value = safe(r.erteam);
+  document.getElementById('ef-comments').value = safe(r.comments);
+  document.getElementById('ef-risk').value = safe(r.risk);
+  document.getElementById('save-msg').textContent = '';
+
+  var sec = document.getElementById('edit-section');
+  sec.style.display='block';
+  sec.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function closeEdit() {
+  document.getElementById('edit-section').style.display='none';
+  currentEditRow = null;
+}
+
+function saveRecord() {
+  if (!currentEditRow) return;
+  var updated = {
+    call:     document.getElementById('ef-call').value.trim(),
+    base:     document.getElementById('ef-base').value,
+    hospital: document.getElementById('ef-hospital').value.trim(),
+    handloc:  document.getElementById('ef-handloc').value,
+    subcat:   document.getElementById('ef-subcat').value,
+    helipad:  document.getElementById('ef-helipad').value,
+    heliadj:  document.getElementById('ef-heliadj').value,
+    erteam:   document.getElementById('ef-erteam').value,
+    comments: document.getElementById('ef-comments').value.trim(),
+    risk:     document.getElementById('ef-risk').value,
+  };
+  // Update in allMissions
+  var idx = allMissions.indexOf(currentEditRow);
+  if (idx>=0) Object.assign(allMissions[idx], updated);
+
+  document.getElementById('save-msg').textContent = '✓ Saved locally — open Google Sheet to update the source directly.';
+  document.getElementById('save-msg').style.color = 'var(--green)';
+
+  // Note: direct Google Sheets write requires OAuth2/Apps Script backend.
+  // Show the update in the UI and direct user to the sheet.
+  renderMissionList();
+  buildBaseData();
+  if (baseData.length) render();
+
+  setTimeout(function(){
+    document.getElementById('save-msg').textContent = '';
+    closeEdit();
+    window.open('https://docs.google.com/spreadsheets/d/'+SHEET_ID+'/edit', '_blank');
+  }, 2000);
+}
+
+// ── DATA LOADING ───────────────────────────────────────────────────────────
+function loadDemo() {
+  allMissions = DEMO_MISSIONS.map(function(r){ return Object.assign({},r); });
+  setStatus('ok','Demo data loaded — 8 SRCA bases · Jan–Apr 2026 · '+allMissions.length+' sample missions');
+  setStatus('ok','Demo data loaded','status-area-ops');
+  render();
+  renderMissionList();
+  showPage('dashboard');
+}
+
+function extractId(s) {
+  s=s.trim();
+  var m=s.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if(m) return m[1];
+  if(/^[a-zA-Z0-9-_]{20,}$/.test(s)) return s;
+  return null;
+}
+
+// Column name -> index mapping helpers
+var COL = {};
+function mapCols(cols) {
+  COL = {};
+  cols.forEach(function(c,i){ COL[c.toLowerCase().trim()]=i; });
+}
+function getCol(name) { return COL[name.toLowerCase().trim()]; }
+function rowVal(row, name) {
+  var i = getCol(name);
+  if (i===undefined) return '';
+  var c = row.c[i];
+  if (!c || c.v===null || c.v===undefined) return '';
+  return String(c.v).trim();
+}
+
+async function loadSheet() {
+  var input = document.getElementById('sheet-url').value.trim();
+  if (!input) { loadDemo(); return; }
+  var id = extractId(input);
+  if (!id) { alert('Could not find a valid Sheet ID. Please paste the full Google Sheets URL.'); return; }
+  SHEET_ID = id;
+
+  setStatus('loading','Connecting to Google Sheet…');
+  setStatus('loading','Connecting to Google Sheet…','status-area-ops');
+  showPage('dashboard');
+  allMissions = [];
+
+  try {
+    for (var si=0; si<SHEET_MONTHS.length; si++) {
+      var sheetName = SHEET_MONTHS[si];
+      var url = 'https://docs.google.com/spreadsheets/d/'+id+'/gviz/tq?tqx=out:json&sheet='+encodeURIComponent(sheetName);
+      var res  = await fetch(url);
+      var txt  = await res.text();
+      var json = JSON.parse(txt.replace(/^[^(]+\(/,'').replace(/\);?$/,''));
+      if (!json.table || !json.table.cols) continue;
+      var cols = json.table.cols.map(function(c){ return (c.label||'').toLowerCase().trim(); });
+      mapCols(json.table.cols.map(function(c){ return c.label||''; }));
+
+      json.table.rows.forEach(function(row) {
+        if (!row.c) return;
+        var status = rowVal(row,'Mission Status');
+        var base   = rowVal(row,'BASE NAME');
+        var call   = rowVal(row,'Alpha Star Call#');
+        var hosptime = parseFloat(rowVal(row,'Hospital Time'));
+        if (!status) return;
+        allMissions.push({
+          sheet:    sheetName,
+          dof:      rowVal(row,'DOF'),
+          customer: rowVal(row,'Customer'),
+          report:   rowVal(row,'Report #'),
+          call:     call,
+          mission:  rowVal(row,'Mission'),
+          acreg:    rowVal(row,'A/C Reg'),
+          location: rowVal(row,'Location'),
+          base:     base || (ABBR_MAP[rowVal(row,'Location')]||''),
+          hospital: rowVal(row,'Receiving Hospital ') || rowVal(row,'Receiving Hospital'),
+          handloc:  rowVal(row,'handover Location ') || rowVal(row,'handover Location'),
+          hosptime: isNaN(hosptime)?'':hosptime,
+          over10:   rowVal(row,'Hospital Time >10'),
+          status:   status,
+          age:      rowVal(row,'age'),
+          gender:   rowVal(row,'gender'),
+          patients: rowVal(row,'patientonboard'),
+          subcat:   rowVal(row,'Sub-category ') || rowVal(row,'Sub-category'),
+          helipad:  rowVal(row,'HOSPITAL HAS HELIPAD?\n(Yes / No → Alt Helipad)') || rowVal(row,'HOSPITAL HAS HELIPAD? (Yes / No → Alt Helipad)'),
+          heliadj:  rowVal(row,'HELIPAD ADJACENT TO ER?\n(Yes / No)') || rowVal(row,'HELIPAD ADJACENT TO ER? (Yes / No)'),
+          erteam:   rowVal(row,'ER TEAM ARRIVES\nTO RECEIVE PATIENT?\n(Yes / No / Ambulance Only)') || rowVal(row,'ER TEAM ARRIVES TO RECEIVE PATIENT? (Yes / No / Ambulance Only)'),
+          comments: rowVal(row,'Comments'),
+          risk:     rowVal(row,'Risk Stratification') || rowVal(row,'Risk Stratification '),
+        });
+      });
+    }
+
+    var completed = allMissions.filter(function(r){ return safe(r.status).toUpperCase()==='COMPLETED'; });
+    setStatus('ok','Live data loaded — '+allMissions.length+' total missions · '+completed.length+' completed · '+new Date().toLocaleTimeString());
+    setStatus('ok','Live data loaded — '+completed.length+' completed missions ready to edit','status-area-ops');
+    render();
+    renderMissionList();
+  } catch(e) {
+    setStatus('err','Error loading sheet: '+e.message);
+    setStatus('err','Error: '+e.message,'status-area-ops');
+    console.error(e);
+  }
+}
+
+// ── EXPORT ─────────────────────────────────────────────────────────────────
+function exportCSV() {
+  var s = [...baseData].sort(function(a,b){ return a.time-b.time; });
+  var c = 'Rank,Base,Hospital Time (min),Missions,>10 min,% >10,vs KPI Target,Status\n';
+  s.forEach(function(d,i){
+    var p = d.missions ? Math.round(d.over10/d.missions*100) : 0;
+    c += (i+1)+','+d.base+','+d.time+','+d.missions+','+d.over10+','+p+'%,'+(d.time-TARGET).toFixed(1)+','+getStatus(d.time).label+'\n';
+  });
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));
+  a.download='SRCA_HospitalTime_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+
+function exportPDF() {
+  var s=[...baseData].sort(function(a,b){return a.time-b.time;});
+  var avg=(baseData.reduce(function(a,d){return a+d.time;},0)/baseData.length).toFixed(1);
+  var total=baseData.reduce(function(a,d){return a+d.missions;},0);
+  var totalO10=baseData.reduce(function(a,d){return a+d.over10;},0);
+  var date=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  var bgMap={good:'#d1fae5',ok:'#dbeafe',warn:'#fef3c7',bad:'#fee2e2'};
+  var txMap={good:'#065f46',ok:'#1e40af',warn:'#92400e',bad:'#991b1b'};
+  var rows=s.map(function(d,i){
+    var st=getStatus(d.time);var diff=d.time-TARGET;
+    var p=d.missions?Math.round(d.over10/d.missions*100):0;
+    return '<tr style="border-bottom:1px solid #f0f0f0">'+
+      '<td style="padding:11px 10px;font-size:13px;color:#999">'+(i+1)+'</td>'+
+      '<td style="padding:11px 10px;font-size:14px;font-weight:700">'+d.base+'</td>'+
+      '<td style="padding:11px 10px;font-size:14px;font-weight:700;color:'+getColor(d.time)+'">'+d.time+' min</td>'+
+      '<td style="padding:11px 10px;font-size:13px">'+d.missions+'</td>'+
+      '<td style="padding:11px 10px;font-size:13px;font-weight:700;color:'+(p>80?'#dc2626':p>50?'#d97706':'#059669')+'">'+d.over10+' ('+p+'%)</td>'+
+      '<td style="padding:11px 10px;font-size:13px;font-weight:700;color:'+(diff<=0?'#065f46':'#991b1b')+'">'+(diff<=0?'▼':'▲')+' '+Math.abs(diff).toFixed(1)+' min</td>'+
+      '<td style="padding:11px 10px"><span style="background:'+bgMap[st.cls]+';color:'+txMap[st.cls]+';font-size:11px;font-weight:700;padding:3px 10px;border-radius:5px">'+st.label+'</span></td>'+
+      '</tr>';
+  }).join('');
+  var w=window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>SRCA Hospital Time Report</title>'+
+    '<style>body{font-family:Arial,sans-serif;margin:0;padding:36px 44px;color:#1a1a2e;}'+
+    '.top{display:flex;justify-content:space-between;align-items:flex-end;padding-bottom:12px;border-bottom:3px solid #cc2020;margin-bottom:20px;}'+
+    '.brand{font-size:18px;font-weight:800;color:#cc2020;}.subbrand{font-size:11px;color:#888;margin-top:3px;}'+
+    '.kpis{display:flex;gap:12px;margin-bottom:24px;}.kpi{flex:1;background:#f6f6f6;border-radius:9px;padding:12px 16px;}'+
+    '.kl{font-size:10px;color:#888;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px;}'+
+    '.kv{font-size:18px;font-weight:800;}table{width:100%;border-collapse:collapse;}'+
+    'th{font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.05em;padding:9px 10px;text-align:left;border-bottom:2px solid #eee;}'+
+    '.foot{margin-top:28px;text-align:center;font-size:11px;color:#bbb;border-top:1px solid #eee;padding-top:12px;}'+
+    '</style></head><body>'+
+    '<div class="top"><div><div class="brand">Saudi Red Crescent Authority — SRCA</div><div class="subbrand">AlphaStar Aviation Services · Aeromedical Program</div></div><div style="font-size:11px;color:#888">Generated '+date+'</div></div>'+
+    '<h1 style="font-size:20px;font-weight:800;margin:0 0 4px">SRCA Hospital Handover Time Report</h1>'+
+    '<p style="font-size:13px;color:#666;margin-bottom:22px">Performance ranking — best to worst · KPI Target: '+TARGET+' min · Jan–Apr 2026</p>'+
+    '<div class="kpis">'+
+    '<div class="kpi"><div class="kl">Hospital Time Average</div><div class="kv" style="color:#1a4a8a">'+avg+' min</div></div>'+
+    '<div class="kpi"><div class="kl">Best base</div><div class="kv" style="color:#059669">'+s[0].base+' · '+s[0].time+' min</div></div>'+
+    '<div class="kpi"><div class="kl">Priority base</div><div class="kv" style="color:#dc2626">'+s[s.length-1].base+' · '+s[s.length-1].time+' min</div></div>'+
+    '<div class="kpi"><div class="kl">Total missions</div><div class="kv">'+total+'</div></div>'+
+    '<div class="kpi"><div class="kl">&gt;10 min</div><div class="kv" style="color:#d97706">'+totalO10+' missions</div></div>'+
+    '</div>'+
+    '<table><thead><tr><th>#</th><th>Base</th><th>Hospital time</th><th>Missions</th><th>&gt;10 min</th><th>vs KPI</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+    '<div class="foot">SRCA Hospital Handover Dashboard · AlphaStar Aviation Services · Confidential</div>'+
+    '</body></html>');
+  w.document.close();
+  setTimeout(function(){ w.print(); },600);
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  var basesTab = document.querySelectorAll('.ntab')[1];
+  if (basesTab) basesTab.addEventListener('click', function(){
+    setTimeout(function(){ if(baseData.length) renderPins(); },50);
+  });
+  // Auto-load from Google Sheet
+  loadSheet();
+});
+</script>
+</body>
+</html>
